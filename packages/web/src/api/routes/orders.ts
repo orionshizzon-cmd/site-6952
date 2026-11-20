@@ -64,6 +64,9 @@ export const orders = {
         ? await db.select().from(schema.products).where(inArray(schema.products.id, ids))
         : [];
       for (const product of rows) {
+        if (!product.active) {
+          throw new ORPCError("BAD_REQUEST", { message: "Produto indisponível." });
+        }
         if (product.stock === null || product.stock === undefined) continue;
         const qty = needed.get(product.id) ?? 0;
         if (product.stock < qty) {

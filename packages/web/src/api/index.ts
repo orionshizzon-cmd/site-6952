@@ -1,6 +1,7 @@
 import type { RouterClient } from "@orpc/server";
 import { createApp } from "./__core/app";
 import { ping } from "./routes/ping";
+import { chatgptProducts } from "./routes/chatgpt-products";
 import { products } from "./routes/products";
 import { categories } from "./routes/categories";
 import { orders } from "./routes/orders";
@@ -49,5 +50,6 @@ export type AppRouter = typeof router;
 export type AppRouterClient = RouterClient<AppRouter>;
 
 const app = createApp(router);
+app.route("/api/chatgpt/products", chatgptProducts);
 
 export default app;
