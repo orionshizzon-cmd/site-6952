@@ -1,20 +1,14 @@
 # Cadastro de produtos Rafa Laser pelo ChatGPT
 
-A integração usa um GPT privado com Actions. O cadastro usa a tabela `products` do Turso e o bucket Tigris já usados pelo painel. A capacidade, o material e as características entram na ficha técnica existente. O preço é um inteiro em centavos de real. Use `null` para “Sob consulta”.
+Um GPT privado pode chamar `POST /api/chatgpt/products` para cadastrar um novo rascunho com pelo menos uma foto. A API usa as tabelas existentes no Turso e grava fotos novas no Tigris com nomes exclusivos. O preço é um inteiro em centavos de real. Use `null` para “Sob consulta”. A categoria é opcional e, quando informada, precisa existir.
 
-- `POST /api/chatgpt/products` cria um rascunho com pelo menos uma foto. O slug deve ser único. Uma tentativa repetida com o mesmo slug retorna `409`.
-- `POST /api/chatgpt/products/{slug}/update` aceita somente rascunhos e preserva os campos omitidos. Ao enviar fotos novas, a primeira substitui a capa e as demais substituem a galeria.
-- Ambos retornam `id`, `slug` e `active: false`. O painel administrativo exibe os rascunhos e permite revisá-los.
-- A categoria é opcional na criação. Use uma categoria existente ou deixe o produto em “Sem categoria”.
+Cada criação retorna `id`, `slug` e `active: false`. O painel administrativo exibe o rascunho. Se o slug já existir, a API retorna `409` antes de buscar fotos. Alterações de produtos continuam disponíveis pelo painel administrativo.
 
-## Configuração em homologação
+## Primeiro teste controlado
 
-1. Use um ambiente HTTPS com banco Turso e bucket Tigris privado separados da produção. Configure as variáveis de banco e armazenamento já usadas pelo site. O painel requer `ADMIN_SESSION_SECRET` ou `BETTER_AUTH_SECRET` para assinar sessões.
-2. Gere uma credencial com `openssl rand -hex 32` e salve-a como `CHATGPT_PRODUCTS_TOKEN` no ambiente da API. Sem a credencial configurada, as rotas ficam desativadas. Para revogar o acesso, remova ou substitua a credencial.
-3. Importe [chatgpt-products.openapi.json](chatgpt-products.openapi.json) nas Actions de um GPT privado e troque o endereço em `servers` pela URL HTTPS de homologação. Selecione autenticação **API Key** do tipo **Bearer** e use a mesma credencial.
-4. Nas instruções do GPT, peça que ele confirme o slug e os dados com o operador, peça fotos se faltarem na criação e envie somente os campos solicitados na atualização. Se um dado comercial estiver faltando, peça que o operador o informe. As duas Actions exigem confirmação do usuário antes de gravar.
-5. Anexe uma foto JPEG, PNG ou WebP à conversa, informe os dados e confira no painel que o produto foi salvo como inativo. Teste uma alteração de preço ou material e confirme que a vitrine continua sem o produto.
+1. Antes de autorizar a publicação, confirme que o ambiente de destino tem `ADMIN_SESSION_SECRET` ou `BETTER_AUTH_SECRET` configurado. Verifique o login administrativo, o catálogo ativo, o fluxo de pedidos e a visualização das fotos existentes. A integração reutiliza o esquema atual e dispensa migração.
+2. Gere uma credencial exclusiva com `openssl rand -hex 32`. Após autorização, salve-a no ambiente da API como `CHATGPT_PRODUCTS_TOKEN`. A rota fica desativada sem esse token ou sem um segredo de sessão administrativa configurado. Para desativá-la, remova o token da integração.
+3. Importe [chatgpt-products.openapi.json](chatgpt-products.openapi.json) nas Actions de um GPT com visibilidade **Somente eu**. Troque `servers` pela URL HTTPS autorizada e use **API Key** do tipo **Bearer** com a mesma credencial. Peça ao GPT que confirme o slug e os dados com o operador antes de criar.
+4. Anexe uma foto própria de teste. Use um slug exclusivo, como `teste-chatgpt-copo-01`. Confirme a gravação e verifique o retorno `201` com `active: false`, a foto no painel e a ausência do produto na vitrine. Repetir o mesmo slug deve retornar `409`. A antiga rota de atualização deve retornar `404`.
 
-A API baixa apenas links HTTPS de `files.oaiusercontent.com`, sem seguir redirecionamentos. Ela aceita até quatro fotos estáticas de 8 MiB e 25 megapixels cada. As imagens são regravadas em WebP sem metadados, com até 2.000 pixels por lado. Se a gravação do produto falhar depois de uma foto ser armazenada, a foto pode permanecer no bucket, com nome derivado do conteúdo. Ao fazer limpeza do armazenamento, preserve os arquivos referenciados no catálogo.
-
-O formato dos anexos e o prazo de validade dos links são definidos pelo ChatGPT. [Documentação da OpenAI sobre envio de arquivos](https://platform.openai.com/docs/actions/sending-files)
+A API aceita até quatro fotos estáticas JPEG, PNG ou WebP de 8 MiB e 25 megapixels cada. A primeira é a capa. A API baixa somente links HTTPS de `files.oaiusercontent.com`, sem seguir redirecionamentos, e regrava as imagens em WebP sem metadados. Se a gravação do produto falhar depois do upload, pode sobrar um arquivo no prefixo `catalog/chatgpt/`. Preserve os arquivos referenciados ao fazer limpeza. [Formato dos anexos do ChatGPT](https://platform.openai.com/docs/actions/sending-files)

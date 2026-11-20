@@ -3,7 +3,6 @@ import { createClient } from "@libsql/client";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHmac } from "node:crypto";
 import sharp from "sharp";
 
 const dir = mkdtempSync(join(tmpdir(), "rafa-chatgpt-"));
@@ -13,7 +12,6 @@ const token = "a".repeat(64);
 const endpoint = "/api/chatgpt/products";
 const file = { download_link: "https://files.oaiusercontent.com/file-test?signature=fake" };
 let app: typeof import("../src/api").default;
-let verifyAdminToken: typeof import("../src/api/lib/admin-auth").verifyToken;
 let s3: typeof import("../src/api/lib/s3").s3;
 let png: Buffer;
 
@@ -35,12 +33,11 @@ beforeAll(async () => {
     setTestEnv("S3_ACCESS_KEY_ID", "fake-access-key"),
     setTestEnv("S3_SECRET_ACCESS_KEY", "fake-secret-key"),
     setTestEnv("S3_BUCKET", "fake-test-bucket"),
-    setTestEnv("ADMIN_SESSION_SECRET", undefined),
+    setTestEnv("ADMIN_SESSION_SECRET", "fake-admin-session-secret"),
     setTestEnv("BETTER_AUTH_SECRET", undefined),
   );
   ({ default: app } = await import("../src/api"));
   ({ s3 } = await import("../src/api/lib/s3"));
-  ({ verifyToken: verifyAdminToken } = await import("../src/api/lib/admin-auth"));
   await sql.executeMultiple(`
     CREATE TABLE products (
       id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE,
@@ -123,12 +120,13 @@ test("desativa a Action sem segredo e rejeita credencial incorreta", async () =>
   expect((await rpc("admin/me", undefined, token)).status).toBe(401);
 });
 
-test("rejeita assinatura administrativa quando falta um segredo configurado", () => {
-  const payload = Buffer.from(`shizzonkay.${Date.now() + 60_000}`).toString("base64url");
-  const signature = createHmac("sha256", "rafa-laser-dev-secret-change-me")
-    .update(payload)
-    .digest("base64url");
-  expect(verifyAdminToken(`${payload}.${signature}`)).toBe(false);
+test("mantém a Action desativada sem um segredo de sessão administrativa", async () => {
+  const restore = setTestEnv("ADMIN_SESSION_SECRET", undefined);
+  try {
+    expect((await post(endpoint, draft)).status).toBe(404);
+  } finally {
+    restore();
+  }
 });
 
 test("limita o JSON e rejeita publicação, preço fracionário e URLs externas", async () => {
@@ -178,36 +176,26 @@ test("cria rascunho com capa, galeria, preço e ficha e evita duplicidade", asyn
     price: 8990,
     specs: "Capacidade: 500 ml\nMaterial: Aço inox\nIsolamento: parede dupla",
   });
-  expect(row.image).toMatch(/^catalog\/chatgpt\/[0-9a-f]{64}\.webp$/);
-  expect(JSON.parse(String(row.media))).toEqual([{ type: "image", key: row.image }]);
+  const photoKey = /^catalog\/chatgpt\/[0-9a-f-]{36}\.webp$/;
+  expect(row.image).toMatch(photoKey);
+  const [galleryPhoto] = JSON.parse(String(row.media));
+  expect(galleryPhoto).toMatchObject({ type: "image", key: expect.stringMatching(photoKey) });
+  expect(galleryPhoto.key).not.toBe(row.image);
   expect(JSON.parse(String(row.colors))).toEqual(draft.colors);
   expect((await post(endpoint, draft)).status).toBe(409);
   expect(upload).toHaveBeenCalledTimes(2);
 });
 
-test("atualiza apenas os campos enviados e mantém o produto inativo", async () => {
-  await sql.execute(
-    "UPDATE products SET specs = 'Capacidade: 500 ml\nMaterial: Aço inox\nIsolamento: duplo' WHERE slug = 'rascunho'",
-  );
-  const response = await post(`${endpoint}/rascunho/update`, { price: 10000, capacity: "650 ml" });
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ slug: "rascunho", active: false });
-  const [row] = (await sql.execute("SELECT * FROM products WHERE slug = 'rascunho'")).rows;
-  expect(row).toMatchObject({
-    name: "Rascunho",
-    price: 10000,
-    active: 0,
-    image: "/images/logo.png",
-    specs: "Capacidade: 650 ml\nMaterial: Aço inox\nIsolamento: duplo",
-  });
-});
-
-test("rejeita atualização de produto público e tentativa de ativar rascunho", async () => {
-  expect((await post(`${endpoint}/publico/update`, { price: 123 })).status).toBe(404);
-  expect((await post(`${endpoint}/rascunho/update`, { active: true })).status).toBe(400);
-  const [row] = (await sql.execute("SELECT active, price FROM products WHERE slug = 'publico'"))
-    .rows;
-  expect(row).toMatchObject({ active: 1, price: null });
+test("bloqueia atualizações e preserva produtos e imagens já cadastrados", async () => {
+  const { download, upload } = mockStorage(png);
+  const before = await sql.execute("SELECT * FROM products ORDER BY id");
+  for (const slug of ["rascunho", "publico"]) {
+    expect((await post(`${endpoint}/${slug}/update`, { price: 123 })).status).toBe(404);
+    expect((await post(endpoint, { ...draft, slug })).status).toBe(409);
+  }
+  expect((await sql.execute("SELECT * FROM products ORDER BY id")).rows).toEqual(before.rows);
+  expect(download).not.toHaveBeenCalled();
+  expect(upload).not.toHaveBeenCalled();
 });
 
 test("mantém rascunhos fora da lista, da consulta por slug e dos pedidos", async () => {
@@ -235,18 +223,6 @@ test("mantém rascunhos fora da lista, da consulta por slug e dos pedidos", asyn
   });
   expect(order.status).toBe(400);
   expect(await order.json()).toMatchObject({ json: { message: "Produto indisponível." } });
-});
-
-test("substitui capa e galeria e preserva os dados comerciais", async () => {
-  const { upload } = mockStorage(png);
-  const response = await post(`${endpoint}/rascunho/update`, { openaiFileIdRefs: [file] });
-  expect(response.status).toBe(200);
-  expect(upload).toHaveBeenCalledTimes(1);
-  const [row] = (
-    await sql.execute("SELECT image, media, active, name FROM products WHERE slug = 'rascunho'")
-  ).rows;
-  expect(row).toMatchObject({ media: "[]", active: 0, name: "Rascunho" });
-  expect(row.image).toMatch(/^catalog\/chatgpt\/[0-9a-f]{64}\.webp$/);
 });
 
 test("rejeita fotos acima do limite antes de enviar ao armazenamento", async () => {

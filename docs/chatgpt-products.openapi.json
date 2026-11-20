@@ -3,12 +3,12 @@
   "info": {
     "title": "Rascunhos de produtos Rafa Laser",
     "version": "1.0.0",
-    "description": "Cadastrar e atualizar produtos ocultos a partir de conversas do ChatGPT."
+    "description": "Cadastra novos produtos ocultos a partir de conversas do ChatGPT."
   },
   "servers": [
     {
       "url": "https://rafa-laser-homologacao.example.com",
-      "description": "Substitua pela URL HTTPS de homologação."
+      "description": "Substitua pela URL HTTPS autorizada para o teste."
     }
   ],
   "security": [
@@ -89,7 +89,7 @@
                       "minLength": 1,
                       "maxLength": 200
                     },
-                    "description": "Características, uma por item. Use Nome: valor quando houver rótulo. Substitui a lista anterior, preservando capacidade e material."
+                    "description": "Características, uma por item. Use Nome: valor quando houver rótulo."
                   },
                   "colors": {
                     "type": "array",
@@ -113,7 +113,7 @@
                         }
                       }
                     },
-                    "description": "Cores disponíveis. A lista enviada substitui a anterior."
+                    "description": "Cores disponíveis."
                   },
                   "openaiFileIdRefs": {
                     "type": "array",
@@ -122,7 +122,7 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "IDs de 1 a 4 fotos JPEG, PNG ou WebP estáticas anexadas nesta conversa, com até 8 MiB por foto. A primeira é a capa. As outras formam a galeria. Ao atualizar, as fotos enviadas substituem capa e galeria."
+                    "description": "IDs de 1 a 4 fotos JPEG, PNG ou WebP estáticas anexadas nesta conversa, com até 8 MiB por foto. A primeira é a capa. As outras formam a galeria."
                   }
                 },
                 "required": [
@@ -168,7 +168,7 @@
             }
           },
           "404": {
-            "description": "Integração desativada ou rascunho indisponível.",
+            "description": "Integração desativada.",
             "content": {
               "application/json": {
                 "schema": {
@@ -178,221 +178,7 @@
             }
           },
           "409": {
-            "description": "Slug já utilizado ou alteração concorrente.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Solicitação acima de 64 KiB.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Tipo de conteúdo inválido.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Categoria desconhecida ou anexo inválido/expirado.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Falha interna ao salvar.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chatgpt/products/{slug}/update": {
-      "post": {
-        "operationId": "updateProductDraft",
-        "summary": "Atualizar um produto oculto",
-        "description": "Atualiza um rascunho pelo slug. Envie apenas os campos confirmados que precisam mudar.",
-        "x-openai-isConsequential": true,
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 100,
-              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-              "description": "Identificador do produto, por exemplo copo-inox-500ml."
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "description": "Nome do produto."
-                  },
-                  "category": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "description": "Nome exato de uma categoria existente. Se omitida na criação, usa Sem categoria."
-                  },
-                  "shortDescription": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 300,
-                    "description": "Resumo para o cartão do produto."
-                  },
-                  "description": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 6000,
-                    "description": "Descrição completa do produto."
-                  },
-                  "price": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0,
-                    "description": "Preço em centavos de real. Por exemplo, R$ 89,90 corresponde a 8990. Null significa Sob consulta."
-                  },
-                  "capacity": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "description": "Capacidade com unidade, por exemplo 500 ml."
-                  },
-                  "material": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "description": "Material, por exemplo aço inox."
-                  },
-                  "features": {
-                    "type": "array",
-                    "maxItems": 20,
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 200
-                    },
-                    "description": "Características, uma por item. Use Nome: valor quando houver rótulo. Substitui a lista anterior, preservando capacidade e material."
-                  },
-                  "colors": {
-                    "type": "array",
-                    "maxItems": 30,
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "name",
-                        "hex"
-                      ],
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 200
-                        },
-                        "hex": {
-                          "type": "string",
-                          "pattern": "^#[0-9a-fA-F]{6}$"
-                        }
-                      }
-                    },
-                    "description": "Cores disponíveis. A lista enviada substitui a anterior."
-                  },
-                  "openaiFileIdRefs": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 4,
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "IDs de 1 a 4 fotos JPEG, PNG ou WebP estáticas anexadas nesta conversa, com até 8 MiB por foto. A primeira é a capa. As outras formam a galeria. Ao atualizar, as fotos enviadas substituem capa e galeria."
-                  }
-                },
-                "minProperties": 1
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Rascunho salvo.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Draft"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Dados inválidos.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credencial inválida.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Integração desativada ou rascunho indisponível.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Slug já utilizado ou alteração concorrente.",
+            "description": "Slug já utilizado.",
             "content": {
               "application/json": {
                 "schema": {

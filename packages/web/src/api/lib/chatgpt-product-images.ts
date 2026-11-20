@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { s3 } from "./s3";
@@ -104,8 +104,7 @@ export async function storeChatGptPhotos(
     }
 
     deadline.throwIfAborted();
-    const hash = createHash("sha256").update(normalized).digest("hex");
-    const key = `catalog/chatgpt/${hash}.webp`;
+    const key = `catalog/chatgpt/${randomUUID()}.webp`;
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.S3_BUCKET,
