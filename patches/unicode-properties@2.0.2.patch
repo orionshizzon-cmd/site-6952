@@ -1,0 +1,14 @@
+diff --git a/binaryTrie.node.js b/binaryTrie.node.js
+index 89e331384ab2b4b7c26a2f3ad9076722b662e842..b9db98ddb53be2f3d0f3e912296a882292338499 100644
+--- a/binaryTrie.node.js
++++ b/binaryTrie.node.js
+@@ -1,5 +1,2 @@
+-import { readFileSync } from 'node:fs';
+-
+-export function getBinaryTrie() {
+-  return readFileSync(new URL('./data.trie', import.meta.url));  
+-}
+\ No newline at end of file
++// Keep Unicode data inside the bundle: deployment does not ship sibling data files.
++export { getBinaryTrie } from './binaryTrie.browser.js';
+\ No newline at end of file

@@ -1,0 +1,17 @@
+import { useState } from "react";
+import { Search, Star, Check } from "lucide-react";
+import { engravingFonts, engravingCategories } from "../../shared/engraving-fonts";
+import { ProductionPreview } from "./production-preview";
+// Mix contrasting shapes in the first screen instead of grouping similar sans-serif fonts.
+const featuredIds = ["greatvibes", "cinzel", "blackopsone", "permanentmarker", "specialelite", "rye", "orbitron", "berkshireswash", "rocksalt", "frederickathegreat", "pacifico", "bebasneue"];
+const displayFonts = [
+ ...featuredIds.flatMap(id => engravingFonts.filter(font => font.id === id)),
+ ...engravingFonts.filter(font => !featuredIds.includes(font.id)),
+];
+export function ProductionFontPicker({name,fontId,onChange}:{name:string;fontId:string;onChange:(id:string)=>void}){
+ const [category,setCategory]=useState("Todas");const [search,setSearch]=useState("");const [limit,setLimit]=useState(12);
+ const [favorites,setFavorites]=useState<string[]>(()=>{try{return JSON.parse(localStorage.getItem("rl-favorite-fonts")||"[]");}catch{return [];}});
+ function star(id:string){const next=favorites.includes(id)?favorites.filter(f=>f!==id):[...favorites,id];setFavorites(next);try{localStorage.setItem("rl-favorite-fonts",JSON.stringify(next));}catch{}}
+ const filtered=displayFonts.filter(f=>(category==="Todas"||(category==="Estilos diferentes"?featuredIds.includes(f.id):category==="Favoritas"?favorites.includes(f.id):f.category===category))&&f.name.toLowerCase().includes(search.toLowerCase()));
+ return <div className="rl-font-library"><div className="rl-font-search"><Search size={17}/><input aria-label="Buscar fonte" placeholder="Buscar pelo nome da fonte…" value={search} onChange={e=>{setSearch(e.target.value);if(e.target.value)setCategory("Todas");setLimit(12);}}/></div><div className="rl-category-tabs" role="tablist" aria-label="Categorias de fontes">{["Todas","Estilos diferentes",...engravingCategories,"Favoritas"].map(c=><button key={c} role="tab" aria-selected={category===c} className={category===c?"active":""} onClick={()=>{setCategory(c);setLimit(12);}}>{c==="Favoritas"&&<Star size={12}/>} {c}</button>)}</div><p className="rl-library-count">{filtered.length} fontes · {engravingFonts.find(f=>f.id===fontId)?.name} selecionada</p><div className="rl-font-grid">{filtered.slice(0,limit).map(f=><div className={`rl-font-option ${fontId===f.id?"selected":""}`} key={f.id}><button type="button" aria-pressed={fontId===f.id} aria-label={`Selecionar ${f.name}`} onClick={()=>onChange(f.id)}><ProductionPreview name={name} fontId={f.id} compact/><small>{f.name}</small>{f.warning&&<small className="rl-font-warning">Traços ou detalhes delicados</small>}{fontId===f.id&&<Check size={14}/>}</button><button type="button" className="rl-font-star" aria-label={`${favorites.includes(f.id)?"Remover":"Favoritar"} ${f.name}`} aria-pressed={favorites.includes(f.id)} onClick={()=>star(f.id)}><Star size={15} fill={favorites.includes(f.id)?"currentColor":"none"}/></button></div>)}</div>{!filtered.length&&<p className="rl-note">{category==="Favoritas"?"Toque na estrela ao lado de uma fonte para salvá-la nas favoritas deste navegador.":"Nenhuma fonte encontrada."}</p>}{filtered.length>limit&&<button className="rl-secondary" style={{marginTop:16}} onClick={()=>setLimit(l=>l+12)}>Ver mais fontes ({filtered.length-limit})</button>}</div>;
+}

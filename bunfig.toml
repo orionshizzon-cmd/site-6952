@@ -1,0 +1,3 @@
+[install]
+# A single hoisted native dependency tree avoids duplicate Expo modules in builds.
+linker = "hoisted"
