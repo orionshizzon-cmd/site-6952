@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { base } from "../__core/app";
 import { adminBase } from "../lib/admin-auth";
@@ -83,7 +83,7 @@ export const products = {
     const [product] = await db
       .select()
       .from(schema.products)
-      .where(eq(schema.products.slug, input.slug));
+      .where(and(eq(schema.products.slug, input.slug), eq(schema.products.active, true)));
     if (!product) throw new ORPCError("NOT_FOUND", { message: "Produto não encontrado" });
     return serialize(product);
   }),
